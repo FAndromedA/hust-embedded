@@ -128,7 +128,8 @@ void fb_update(void)
 
 /*======================================================================*/
 
-static void * _begin_draw(int x, int y, int w, int h)
+//static 
+void * _begin_draw(int x, int y, int w, int h)
 {
 	int x2 = x+w;
 	int y2 = y+h;
@@ -158,14 +159,15 @@ void fb_draw_rect(int x, int y, int w, int h, int color)
 	if(w<=0 || h<=0) return;
 	int *buf = _begin_draw(x,y,w,h);
 /*---------------------------------------------------*/
+	// printf("%d %d\n", color,w);
 	// printf("you need implement fb_draw_rect()\n"); exit(0);
-	//buf += y  * SCREEN_WIDTH;
+	buf += y  * SCREEN_WIDTH + x;
 	for(register int i = 0;i < h;++ i) {
 		for(register int j = 0;j < w;++ j) {
-			*(buf + (i + y)*SCREEN_WIDTH + (j + x)) = color;
+			*(buf + j) = color;
 		}
-		// memset(buf + x, color, w);
-		// buf += SCREEN_WIDTH;
+		// memset(buf, color, w * sizeof(int));
+		buf += SCREEN_WIDTH;
 	}
 /*---------------------------------------------------*/
 	return;
@@ -278,10 +280,10 @@ void fb_draw_image(int x, int y, fb_image *image, int color)
 	if(image->color_type == FB_COLOR_RGB_8880) /*lab3: jpg*/
 	{
 		//printf("you need implement fb_draw_image() FB_COLOR_RGB_8880\n"); exit(0);
-		src = image->content + ww * (-offsety);
+		src = image->content - (ww * offsety) - (offsetx << 2);
 		for(register int j = 0;j < h;++ j) { // h = image_h + offsety(仅当y<0时)
 			//int h_bias1 = (y + j) * SCREEN_WIDTH, h_bias2 = j * (ww >> 2);
-			memcpy(dst, src + (ww - (offsetx << 2)), w << 2);
+			memcpy(dst, src, w << 2);
 			// for(register int i = 0;i < w;++ i) {
 			// 	*(buf + (x + i) + h_bias1) = *((int *)image->content + i + h_bias2);
 			// }
@@ -294,7 +296,7 @@ void fb_draw_image(int x, int y, fb_image *image, int color)
 	{
 		//printf("you need implement fb_draw_image() FB_COLOR_RGBA_8888\n"); exit(0);
 		for(register int j = 0;j < h;++ j) {
-			src = (image->content + j * ww);
+			src = (image->content + (j - offsety) * ww - (offsetx << 2));
 			dst = (char *)(buf + (y + j) * SCREEN_WIDTH + x);
 			for(register int i = 0;i < w;++ i) {
 				_8888_TO_0888(dst, src, -1);
@@ -308,7 +310,7 @@ void fb_draw_image(int x, int y, fb_image *image, int color)
 	{
 		//printf("you need implement fb_draw_image() FB_COLOR_ALPHA_8\n"); exit(0);
 		for (register int j = 0;j < h;++ j) {
-			src = (image->content + j * ww);
+			src = (image->content + (j - offsety) * ww - offsetx);
 			dst = (char *)(buf + (y + j) * SCREEN_WIDTH + x);
 			for(register int i = 0;i < w;++ i) {
 				int tmp = color;
@@ -547,7 +549,7 @@ void fb_draw_circle(int x, int y, int radius, int color)
 {
 	int *buf = _begin_draw(max(0, x - radius), max(0, y - radius), 2*radius, 2*radius);
 
-	printf("x:%d y:%d d:%d r:%d\n",max(0, x - radius), max(0, y - radius), 2*radius, radius);
+	//printf("x:%d y:%d d:%d r:%d\n",max(0, x - radius), max(0, y - radius), 2*radius, radius);
 
 	int r2 = radius * radius;
 	buf += y * SCREEN_WIDTH;
@@ -556,7 +558,7 @@ void fb_draw_circle(int x, int y, int radius, int color)
 		int stx = max(0, x - len);
 		int edx = min(SCREEN_WIDTH - 1, x + len);
 		if (y + i < SCREEN_HEIGHT) {
-			printf("%d %d %d %d\n", y + i, stx, edx, color);
+			//printf("%d %d %d %d\n", y + i, stx, edx, color);
 			// memset(buf + (y + i) * SCREEN_WIDTH + stx, color, (edx - stx + 1));
 			for(int j = stx;j < edx;++ j) {
 				fb_draw_pixel(j,y+i,color);
@@ -565,7 +567,7 @@ void fb_draw_circle(int x, int y, int radius, int color)
 		}
 		if (y - i >= 0 && i) {
 			// memset(buf + (y - i) * SCREEN_WIDTH + stx, color, (edx - stx + 1));
-			printf("%d %d %d %d\n", y - i, stx, edx, color);
+			//printf("%d %d %d %d\n", y - i, stx, edx, color);
 			for(int j = stx;j < edx;++ j) {
 				fb_draw_pixel(j,y-i,color);
 				// *(buf + j + (y - i) * SCREEN_WIDTH) = color;

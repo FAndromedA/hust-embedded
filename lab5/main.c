@@ -79,7 +79,7 @@ static void timer_cb(int period) /*该函数0.5秒执行一次*/
 {
 	char buf[100];
 	sprintf(buf, "%d", st++);
-	printf("%d\n",st);
+	//printf("%d\n",st);
 	fb_draw_rect(TIME_X, TIME_Y, TIME_W, TIME_H, COLOR_BACKGROUND);
 	fb_draw_border(TIME_X, TIME_Y, TIME_W, TIME_H, COLOR_TEXT);
 	fb_draw_text(TIME_X+2, TIME_Y+20, buf, 24, COLOR_TEXT);
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 	fb_draw_text(SEND_X+2, SEND_Y+30, "send", 24, COLOR_TEXT);
 	fb_update();
 
-	touch_fd = touch_init("/dev/input/event6");
+	touch_fd = touch_init("/dev/input/event2");
 	
 	task_add_file(touch_fd, touch_event_cb);
 

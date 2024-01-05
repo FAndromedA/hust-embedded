@@ -94,6 +94,7 @@ void fb_draw_image(int x, int y, fb_image *image, int color);
 #define _Vertical_n90 3//逆时针90
 #define _Horizontal_neg 2//倒置180
 void fb_draw_jpg(int x, int y, fb_image *image, double scaling, int direction);
+void * _begin_draw(int x, int y, int w, int h);
 //
 void fb_draw_text(int x, int y, char *text, int font_size, int color);
 

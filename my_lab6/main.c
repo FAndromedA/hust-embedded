@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "../common/common.h"
+#include"/root/lab-2022-st/common/external/include/jpeglib.h"
 
 #define COLOR_BACKGROUND	FB_COLOR(0xff,0xff,0xff)
 #define COLOR_TEXT			FB_COLOR(0x0,0x0,0x0)
@@ -18,6 +19,8 @@ static int bluetooth_fd;
 #define SEND_W	60
 #define SEND_H	60
 
+void write_jpeg(const char *filename, uint8_t *image_data, int width, int height, int quality);
+
 static void draw_button() {
 	fb_draw_rect(SEND_X, SEND_Y, SEND_W, SEND_H, COLOR_BACKGROUND);
 	fb_draw_border(SEND_X, SEND_Y, SEND_W, SEND_H, COLOR_TEXT);
@@ -28,6 +31,12 @@ static void draw_button() {
 	fb_draw_rect(SEND_X, SEND_Y + 2*SEND_H, SEND_W, SEND_H, COLOR_BACKGROUND);
 	fb_draw_border(SEND_X, SEND_Y + 2*SEND_H, SEND_W, SEND_H, COLOR_TEXT);
 	fb_draw_text(SEND_X+2, SEND_Y + 2*SEND_H+30, "rotate", 16, COLOR_TEXT);
+	fb_draw_rect(SEND_X, SEND_Y + 3*SEND_H, SEND_W, SEND_H, COLOR_BACKGROUND);
+	fb_draw_border(SEND_X, SEND_Y + 3*SEND_H, SEND_W, SEND_H, COLOR_TEXT);
+	fb_draw_text(SEND_X+2, SEND_Y + 3*SEND_H+30, "prtsc", 20, COLOR_TEXT);
+	fb_draw_rect(SEND_X, SEND_Y + 4*SEND_H, SEND_W, SEND_H, COLOR_BACKGROUND);
+	fb_draw_border(SEND_X, SEND_Y + 4*SEND_H, SEND_W, SEND_H, COLOR_TEXT);
+	fb_draw_text(SEND_X+2, SEND_Y + 4*SEND_H+30, "draw", 24, COLOR_TEXT);
 }
 
 static void init_UI() {
@@ -37,6 +46,20 @@ static void init_UI() {
     // fb_draw_border(SEND_X, SEND_Y+SEND_H, SEND_W, SEND_H, COLOR_TEXT);
 	// fb_draw_text(SEND_X+2, SEND_Y+30, "send", 24, COLOR_TEXT);
     // fb_draw_text(SEND_X+2, SEND_Y+SEND_H+30, "clear", 20, COLOR_TEXT);
+}
+
+int finger_color[20];
+void finger_color_init() {
+	finger_color[0] = FB_COLOR(0x3c, 0x4e, 0x72);
+	finger_color[1] = FB_COLOR(0x31, 0xc2, 0x72);
+	finger_color[2] = FB_COLOR(0xc0, 0xb6, 0x9b);
+	finger_color[3] = FB_COLOR(0xf2, 0x33, 0x21);
+	finger_color[4] = FB_COLOR(0x58, 0xa6, 0xa6);
+	finger_color[5] = FB_COLOR(0x2f, 0x2c, 0x37);
+	finger_color[6] = FB_COLOR(0xda, 0x5f, 0xa2);
+	finger_color[7] = FB_COLOR(0x41, 0x04, 0x14);
+	finger_color[8] = FB_COLOR(0xf2, 0x6e, 0x23);
+	finger_color[9] = FB_COLOR(0xae, 0xce, 0xb9);///
 }
 
 static int fingerExist = 0, fingerCreated = 0;
@@ -51,11 +74,14 @@ static int pen_y = 30;
 static int img_sx = 0, img_sy = 0;
 static double scaling = 1.0;
 static int direction = 0;
-const static double maxScaling = 4.0;
-const static double minScaling = 0.25;
+static int drawing = 0;
+const static double maxScaling = 5.0;
+const static double minScaling = 0.20;
 
 static struct FingerInfo *pref1 = NULL, *pref2 =  NULL;
 static double predist;
+
+const int radius = 15;
 
 static void touch_event_cb(int fd)
 {
@@ -82,6 +108,12 @@ static void touch_event_cb(int fd)
 			printf("press button rotate\n");
 			direction = (direction + 1) % 4;
 		}
+		else if((x>=SEND_X)&&(x<SEND_X+SEND_W)&&(y>=SEND_Y+3*SEND_H)&&(y<SEND_Y+4*SEND_H)){
+			write_jpeg("drawjpg.jpg", (JSAMPLE *)_begin_draw(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT), SCREEN_WIDTH, SCREEN_HEIGHT, 90);
+		}
+		else if((x>=SEND_X)&&(x<SEND_X+SEND_W)&&(y>=SEND_Y+4*SEND_H)&&(y<SEND_Y+5*SEND_H)){
+			drawing ^= 1;
+		}
 		else {
 			fingerCreated ++;
 			fingerInfo[finger].lastx = x;
@@ -91,14 +123,33 @@ static void touch_event_cb(int fd)
 		}
 		break;
 	case TOUCH_MOVE:
-		
-		if (fingerExist == 1) { // 只有一根手指是拖动
+		if (drawing) {
+			int f_color = finger_color[(finger + fingerInfo[finger].createdAt) % 10];
+			fb_draw_circle(x, y, radius, f_color);
+
+			if ((x - fingerInfo[finger].lastx) * (x - fingerInfo[finger].lastx) + (y - fingerInfo[finger].lasty) * (y - fingerInfo[finger].lasty) > 0) {
+				fb_draw_circle((3 * x + fingerInfo[finger].lastx)/4, (3 * y + fingerInfo[finger].lasty)/4, radius, f_color);
+				fb_draw_circle((x + 3 * fingerInfo[finger].lastx)/4, (y + 3 * fingerInfo[finger].lasty)/4, radius, f_color);
+			}
+			if ((x - fingerInfo[finger].lastx) * (x - fingerInfo[finger].lastx) + (y - fingerInfo[finger].lasty) * (y - fingerInfo[finger].lasty) > 0) {
+				fb_draw_circle((x + fingerInfo[finger].lastx)/2, (y + fingerInfo[finger].lasty)/2, radius, f_color);
+			}
+			if ((x - fingerInfo[finger].lastx) * (x - fingerInfo[finger].lastx) + (y - fingerInfo[finger].lasty) * (y - fingerInfo[finger].lasty) > 0) {
+				fb_draw_circle((5 * x + 3 * fingerInfo[finger].lastx)/8, (5 * y + 3 * fingerInfo[finger].lasty)/8, radius, f_color);
+				fb_draw_circle((3 * x + 5 * fingerInfo[finger].lastx)/8, (3 * y + 5 * fingerInfo[finger].lasty)/8, radius, f_color);
+				fb_draw_circle((7 * x + fingerInfo[finger].lastx)/8, (7 * y + fingerInfo[finger].lasty)/8, radius, f_color);
+				fb_draw_circle((x + 7 * fingerInfo[finger].lastx)/8, (y + 7 * fingerInfo[finger].lasty)/8, radius, f_color);
+			}
+			fingerInfo[finger].lastx = x;
+			fingerInfo[finger].lasty = y;
+		}
+		else if (fingerExist == 1) { // 只有一根手指是拖动
 			img_sx += x - fingerInfo[finger].lastx;
 			img_sy += y - fingerInfo[finger].lasty;
 			fingerInfo[finger].lastx = x;
 			fingerInfo[finger].lasty = y;
 		}
-		if (fingerExist >= 2) { // 大于两根手指则根据创建时间取前两根，来缩放
+		else if (fingerExist >= 2) { // 大于两根手指则根据创建时间取前两根，来缩放
 			//printf("type=%d,x=%d,y=%d,finger=%d,fingerExist=%d\n",type,x,y,finger,fingerExist);
 			fingerInfo[finger].lastx = x;
 			fingerInfo[finger].lasty = y;
@@ -208,6 +259,8 @@ static void convertHexToBinaryAndWriteToFile(char* hexBuff, size_t hexLen,FILE* 
 	fwrite(hexBuff, 1, hexLen, outFile);
 }
 
+myTime start_time, end_time;
+
 static void bluetooth_tty_event_cb(int fd)
 {
 	char buf[1024];
@@ -227,6 +280,7 @@ static void bluetooth_tty_event_cb(int fd)
 	// printf("%d\n", transfer_mode);
 	if (strstr(buf, ststr) != NULL) {
 		if (!transfer_levels) {
+			start_time = task_get_time();
 			existPhoto = 0; // 修改时图片不完整
 			img_sx = img_sy = 0;
 			scaling = 1.0;
@@ -250,7 +304,8 @@ static void bluetooth_tty_event_cb(int fd)
 		
 		if (transfer_mode == transfer_TEXT) {
 			buf[n] = '\0';
-			//printf("bluetooth tty receive \"%s\"\n", buf);
+			// printf("bluetooth tty receive \"%s\"\n", buf);
+			// for(int i = 0;i < n;++ i) printf("%2x ", buf[i]);
 			fb_draw_text(2, pen_y, buf, 24, COLOR_TEXT); fb_update();
 			pen_y += 30;
 			return;
@@ -267,13 +322,17 @@ static void bluetooth_tty_event_cb(int fd)
 		if (n != 1024) buf[n] = '\0';
 		// because the function strstr() will stop when meeting the 0 but we do transfering 0 in hex data 
 		// so after writing into file we could let 0 to 2 so that we can find if there is edstr inside
-		
+		end_time = task_get_time();
+		//printf("%d\n", end_time - start_time);
 		char * posc;
-		if ((posc = strstr(buf, edstr)) != NULL) { 
+		if ((posc = strstr(buf, edstr)) != NULL || (end_time - start_time > 20 * 1000)) { 
             transfer_levels --; 
+			
 			//printf("%d %d %2x %2x\n", transfer_levels, (posc-buf), *posc, *(posc+1));
-			if (!transfer_levels) {// 可能会遇到嵌套的jpg，所以需要当最底层的结束符出现时才算整个文件的结束。
+			
+			if (!transfer_levels || (end_time - start_time > 20 * 1000)) {// 可能会遇到嵌套的jpg，所以需要当最底层的结束符出现时才算整个文件的结束。
 				transfer_mode = transfer_TEXT;
+				transfer_levels = 0;
 				fclose(jpegFile);
 				jpegFile = NULL;
 
@@ -326,6 +385,8 @@ static void timer_cb(int period) /*该函数0.1秒执行一次*/
 			//printf("loading image on x:%d, y:%d, scaling:%.2lf\n", img_sx, img_sy, scaling);
 			//fb_draw_image(img_sx, img_sy, img, 0);
 			fb_draw_jpg(img_sx, img_sy, img, scaling, direction);
+			
+			//exit(0);
 			//fb_free_image(img);
 			prex = img_sx; prey = img_sy;
 			preScaling = scaling;
@@ -335,6 +396,7 @@ static void timer_cb(int period) /*该函数0.1秒执行一次*/
 			fb_draw_border(TIME_X, TIME_Y + TIME_H, TIME_W, TIME_H, COLOR_TEXT);
 			fb_draw_text(TIME_X+2, TIME_Y + TIME_H +20, buf_scale, 24, COLOR_TEXT);
 			draw_button();
+			
 		}
 	}
 	fb_draw_rect(TIME_X, TIME_Y, TIME_W, TIME_H, COLOR_BACKGROUND);
@@ -347,20 +409,60 @@ static void timer_cb(int period) /*该函数0.1秒执行一次*/
 
 int main(int argc, char *argv[])
 {
+	finger_color_init();
 	fb_init("/dev/fb0");
 	font_init("./font.ttc");
 	init_UI();
 	fb_update();
 
 	touch_fd = touch_init("/dev/input/event2");
-	
 	task_add_file(touch_fd, touch_event_cb);
 
 	bluetooth_fd = bluetooth_tty_init("/dev/rfcomm0");
 	if(bluetooth_fd == -1) return 0;
 	task_add_file(bluetooth_fd, bluetooth_tty_event_cb);
 
-	task_add_timer(100, timer_cb); /*增加0.5秒的定时器*/
+	task_add_timer(100, timer_cb); /*增加0.1秒的定时器*/
 	task_loop();
+	
 	return 0;
+}
+
+
+void write_jpeg(const char *filename, JSAMPLE *image_data, int width, int height, int quality) {
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+
+    FILE *outfile;
+    if ((outfile = fopen(filename, "wb")) == NULL) {
+        fprintf(stderr, "Can't open %s for writing.\n", filename);
+        exit(EXIT_FAILURE);
+    }
+    jpeg_stdio_dest(&cinfo, outfile);
+
+    cinfo.image_width = width;
+    cinfo.image_height = height;
+    cinfo.input_components = 4;  // BGRX image
+    cinfo.in_color_space = JCS_EXT_BGRX; // Specify extended BGRX color space
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, quality, TRUE);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    JSAMPROW row_pointer[1];
+    int row_stride = width * cinfo.input_components;
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+        row_pointer[0] = &image_data[cinfo.next_scanline * row_stride];
+        jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+
+    fclose(outfile);
+    jpeg_destroy_compress(&cinfo);
 }
